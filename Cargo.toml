@@ -6,3 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+minidump="0.14.0"
+minidump-processor = { version = "0.14.0", features = [
+    "http",
+]}
+serde_json="1.0"
