@@ -1,15 +1,10 @@
 mod read_dmp;
-
-
-
-
+use tokio::task;
 fn main() {
    let mut dmp_item = read_dmp::ReadDmp{
-        dmp_path:"234".to_string(),
+        dmp_path:"test_data/test.dmp".to_string(),
    };
-   let dmp_result = dmp_item.get_dmp_module();
-   match dmp_result {
-    Ok(v) => println!("working with version: {v:?}"),
-    Err(e) => println!("error parsing header: {e:?}"),
-    }
+
+   let dmp_result =dmp_item.read_mini_dmp();
+   println!("{:?}",dmp_result);
 }
