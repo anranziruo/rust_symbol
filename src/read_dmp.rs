@@ -4,6 +4,7 @@ use anyhow::{self};
 use rust_symbol::get_file_name;
 use serde::{Serialize};
 use std::path::PathBuf;
+use serde_json::Value;
 
 #[derive(Debug, Clone,Serialize)]
 pub struct DmpModule {
@@ -53,7 +54,7 @@ impl ReadDmp {
     }
 
     //读取dmp文件信息
-    pub async fn read_mini_dmp(self)-> Result<DmpInfos, anyhow::Error>{
+    pub async fn read_mini_dmp(self)-> Result<(),anyhow::Error>{
 
         let dmp_detail = DmpInfos{
             content:String::from("")
@@ -70,8 +71,11 @@ impl ReadDmp {
 
         let state = minidump_processor::process_minidump(&dump, &provider)
         .await
-        .map_err(|_| ());
-
-        Ok(dmp_detail)
+        .map_err(|_| ())?;
+        
+        let mut json_output = Vec::new();
+        state.print_json(&mut json_output, false).map_err(|_| ())?;
+        let json: Value = serde_json::from_slice(&json_output).map_err(|_| ())?;
+        Ok(())
     }
 }
