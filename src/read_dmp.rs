@@ -1,10 +1,10 @@
 use minidump::*;
 use minidump_processor::{ProcessorOptions,Symbolizer,symbols};
 use anyhow::{self};
-use rust_symbol::get_file_name;
 use serde::{Serialize};
 use std::path::PathBuf;
 use serde_json::Value;
+use memmap2::*;
 
 #[derive(Debug, Clone,Serialize)]
 pub struct DmpModule {
@@ -20,47 +20,21 @@ pub struct DmpModule {
     pub end_address:String
 }
 
-#[derive(Debug, Clone,Serialize)]
-pub struct DmpInfos {
-    pub content:String
-}
-
 
 pub struct ReadDmp{
-    pub dmp_path:String
+    pub report_id:String
 }
 
 
 impl ReadDmp {
-
-    //读取dmp的符号信息
-    pub fn get_dmp_module(self)-> Result<Vec<DmpModule>,anyhow::Error> {
-        let mut dump = minidump::Minidump::read_path(self.dmp_path)?;
-        let mut module_lists = Vec::new();
-        if let Ok(modules) = dump.get_stream::<MinidumpModuleList>() {
-            for module_item in modules.iter(){
-                module_lists.push(DmpModule {
-                    debug_id:module_item.debug_identifier().unwrap_or_default().uuid().to_string(),
-                    appendix:module_item.debug_identifier().unwrap_or_default().appendix(),
-                    debug_file:get_file_name(module_item.debug_file().unwrap_or_default().to_string()),
-                    code_file:get_file_name(module_item.code_file().to_string()),
-                    start_address:format!("{:#018X}", module_item.base_address()),
-                    end_address:format!("{:#018X}",module_item.base_address()+module_item.size()),
-                    code_version:module_item.version().unwrap_or_default().to_string()
-                });
-            }
-        }
-        Ok(module_lists)
-    }
-
     //读取dmp文件信息
-    pub async fn read_mini_dmp(self)-> Result<(),anyhow::Error>{
+    pub fn read_mini_dmp(self,data: &mut Vec<u8>)-> Result<(),anyhow::Error>{
+        //写入到mmap
+        let mut mmap = MmapMut::map_anon(data.len())?;
+        (&mut mmap[..]).write(&data)?;
+        let mmap = mmap.make_read_only()?;
 
-        let dmp_detail = DmpInfos{
-            content:String::from("")
-        };
-
-        let dump = minidump::Minidump::read_path(self.dmp_path)?;
+        let dump = Minidump::read(mmap).map_err(|error| error)?;
 
         //设置空路径
         let mut path = PathBuf::new();
@@ -71,11 +45,12 @@ impl ReadDmp {
 
         let state = minidump_processor::process_minidump(&dump, &provider)
         .await
-        .map_err(|_| ())?;
+        .map_err(|error| error)?;
         
         let mut json_output = Vec::new();
-        state.print_json(&mut json_output, false).map_err(|_| ())?;
-        let json: Value = serde_json::from_slice(&json_output).map_err(|_| ())?;
+        state.print_json(&mut json_output, false).map_err(|error| error)?;
+        let json: Value = serde_json::from_slice(&json_output).map_err(|error| error)?;
+        println!("{:?}",json.to_string());
         Ok(())
     }
 }
